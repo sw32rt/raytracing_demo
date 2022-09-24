@@ -4,14 +4,11 @@
 
 
 #include <iostream>
-#include <unistd.h>
 #include <stdio.h>
 #include <math.h>
 #include <vector>
-#include <X11/Xlib.h>
-#include "X11/keysym.h"
 #include <string>
-
+#include "port.h"
 
 
 using namespace std;
@@ -25,7 +22,7 @@ class Vect;
 char ray_char(Vect *ray, int refl);
 bool ray_done(Vect *ray);
 string setc(int row, int col);
-bool key_is_pressed(KeySym ks);
+bool key_is_pressed(KeyCode ks);
 
 
 
@@ -116,12 +113,11 @@ public:
 };
 
 
-#define MOVE_ANGLE 0.01
-#define MOVE_POSITION 0.03
+#define MOVE_ANGLE 0.05
+#define MOVE_POSITION 0.1
 
 #define RAYSTEP 0.02
 #define RAYSTEPS 5000
-
 
 class Game {
 public:
@@ -130,6 +126,7 @@ public:
 	Direction dir;
 	float width, height;
 	int xres, yres;
+	string displayStr;
 
 	Game(Vect start_pos, Direction start_dir, float width, 
 			float height, int xres, int yres) {
@@ -139,6 +136,7 @@ public:
 		this->dir = start_dir;
 		this->xres = xres;
 		this->yres = yres;
+		displayStr.reserve(xres * yres);
 	}
 
 	void add_ball(Ball b) {
@@ -147,7 +145,7 @@ public:
 
 	void make_pic(void) {
 		// rays through equidistant points on width*height rectangle with distance 1 from viewer
-
+		
 		Vect v1 = dir.to_unit();
 		// v2 points from middle of the rectangle to upper edge
 		Vect v2 = {
@@ -160,6 +158,7 @@ public:
  		Vect v3 = {-v1.y, v1.x, 0};
  		v3.normalize();
  		v3.scale(width/2);
+		displayStr.clear();
 
 		for (int row = 0; row < yres; ++row) {
 			for (int col = 0; col < xres; ++col) {
@@ -213,19 +212,20 @@ public:
 						ray.add(move);
 					}
 				}
-
-				cout << setc(row, col) << ray_char(&ray, times_reflected) << flush;
+				displayStr += ray_char(&ray, times_reflected);
 			}
+			displayStr += setc(row, 0);
 		}
+		cout << displayStr;
 	}
 
 	void start(void) {
-		KeySym keys[] = {XK_Up, XK_Down, XK_Left, XK_Right};
+		KeyCode keys[] = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT};
 		while (true) {
 			make_pic();
-			for (int key: keys) {
+			for (KeyCode key: keys) {
 				if (key_is_pressed(key)) {
-					if (key_is_pressed(XK_Shift_L)) {
+					if (key_is_pressed(KEY_SHIFT_L)) {
 						move_view(key);
 					}
 					else {
@@ -236,22 +236,22 @@ public:
 		}
 	}
 
-	void move_view(KeySym key) {
-		if (key == XK_Up) {
+	void move_view(KeyCode key) {
+		if (key == KEY_UP) {
 			dir.ang_v += MOVE_ANGLE;
 		}
-		else if (key == XK_Down) {
+		else if (key == KEY_DOWN) {
 			dir.ang_v -= MOVE_ANGLE;
 		}
-		if (key == XK_Left) {
+		if (key == KEY_LEFT) {
 			dir.ang_h -= MOVE_ANGLE;
 		}
-		if (key == XK_Right) {
+		if (key == KEY_RIGHT) {
 			dir.ang_h += MOVE_ANGLE;
 		}
 	}
 
-	void move_position(KeySym key) {
+	void move_position(KeyCode key) {
 		Vect dir_vect = dir.to_unit();
 		float xmov = dir_vect.x;
 		float ymov = dir_vect.y;
@@ -260,22 +260,22 @@ public:
 		ymov *= scale;
 		xmov *= MOVE_POSITION;
 		ymov *= MOVE_POSITION;
-		if (key == XK_Up) {
+		if (key == KEY_UP) {
 			// move forward
 			pos.x += xmov;
 			pos.y += ymov;
 		}
-		else if (key == XK_Down) {
+		else if (key == KEY_DOWN) {
 			// move back
 			pos.x -= xmov;
 			pos.y -= ymov;
 		}
-		if (key == XK_Left) {
+		if (key == KEY_LEFT) {
 			// move left
 			pos.x += ymov;
 			pos.y -= xmov;
 		}
-		if (key == XK_Right) {
+		if (key == KEY_RIGHT) {
 			// move right
 			pos.x -= ymov;
 			pos.y += xmov;
@@ -324,19 +324,6 @@ char ray_char(Vect *ray, int refl) {
 	}
 }
 
-
-bool key_is_pressed(KeySym ks) {
-    Display *dpy = XOpenDisplay(":0");
-    char keys_return[32];
-    XQueryKeymap(dpy, keys_return);
-    KeyCode kc2 = XKeysymToKeycode(dpy, ks);
-    bool isPressed = !!(keys_return[kc2 >> 3] & (1 << (kc2 & 7)));
-    XCloseDisplay(dpy);
-    return isPressed;
-}
-
-
-
 int main(int argc, char *argv[]) {
 	Vect start_pos = {0, 0, 1};
 	Direction start_dir = {-0.2, 0};
@@ -353,9 +340,9 @@ int main(int argc, char *argv[]) {
 	}
 	Game game = Game(start_pos, start_dir, 2, 2, width, height);
 	// add some balls and start the "game"
-	Ball b = {{5, 0, 2}, 2};
+	Ball b = {{10, 0, 2}, 2};
 	game.add_ball(b);
-	Ball c = {{10, 0, 2}, 2};
+	Ball c = {{20, 10, 2}, 2};
 	game.add_ball(c);
 	Ball d = {{7.5, 0, 8}, 4};
 	game.add_ball(d);
